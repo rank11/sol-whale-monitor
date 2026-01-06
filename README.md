@@ -1,182 +1,128 @@
-# Solana 钱包余额监控系统
+🐳 Solana 巨鲸监控系统 (V12 增强版)
+这是一个专为监控大量 Solana 钱包（如“聪明钱”或“巨鲸”）而设计的高级监控系统。
 
-这是一个基于 TypeScript 和 @solana/web3.js 的实时监控脚本，用于监控 Solana 钱包地址的 SOL 余额变化。
+相比于传统的 WebSocket 监控，本项目针对**公共节点（Public RPC）**进行了深度优化，能够同时稳定监控数百个钱包而不触发 429 Too Many Requests 限流，并且内置了强大的交易解析引擎，能够精准识别代币名称、合约地址（CA）以及具体的买卖行为。
 
-## 功能特性
+✨ 核心特性
+🛡️ 独家抗 429 机制：抛弃传统的 WebSocket 长连接，采用分组批量轮询 (Batch Polling) + 队列处理策略。实测可使用免费公共节点稳定监控 300+ 个钱包。
 
-- ✅ 实时监控多个钱包地址的余额变化
-- ✅ 自动识别转入/转出交易
-- ✅ 显示变动金额和当前余额
-- ✅ 使用 WebSocket 长连接，延迟低、效率高
-- ✅ 完整的 TypeScript 类型安全
+🌐 内置代理支持：原生集成 https-proxy-agent，完美解决国内网络环境下的 fetch failed 问题，直连 Solana RPC 和 DexScreener API。
 
-## 技术栈
+🧠 智能交易解析：
 
-- **Node.js** - JavaScript 运行时环境
-- **TypeScript** - 提供类型安全的 JavaScript
-- **@solana/web3.js** - Solana 官方 JavaScript SDK
+上帝视角：通过解析 Transaction Log，精准区分 Swap (买卖)、Transfer (转账) 和 Wrap (SOL打包)。
 
-## 安装步骤
+精准计费：自动合并 Native SOL 和 wSOL 的变动，防止因 wSOL 转换导致的“0 金额”误报。
 
-### 1. 初始化项目
+💎 代币深度识别：
 
-在项目根目录执行：
+多重数据源：优先使用 DexScreener API 获取准确的代币名称（如 Pnut, ChillGuy），链上 Metadata 作为备选。
 
-```bash
-npm init -y
-```
+名称清洗：自动过滤链上乱码、日文或特殊符号，强制显示标准 Ticker。
 
-这会创建 `package.json` 文件（如果还没有的话）。
+CA 直显：每笔交易强制显示代币合约地址 (CA)，方便直接复制去看线。
 
-### 2. 安装依赖
+🔄 防漏单重试：内置“回马枪”机制，如果余额变动但 RPC 尚未索引交易详情，会自动暂停重试，大幅降低漏单率。
 
-安装项目所需的依赖包：
+🛠️ 技术栈
+Runtime: Node.js & TypeScript
 
-```bash
-# 安装生产依赖（@solana/web3.js）
-npm install @solana/web3.js
+Solana SDK: @solana/web3.js
 
-# 安装开发依赖（TypeScript 和 ts-node）
+Network: node-fetch + https-proxy-agent (代理增强)
+
+API: DexScreener (元数据补全)
+
+🚀 快速开始
+1. 环境准备
+确保你已安装 Node.js，并拥有一个可用的代理工具（如 Clash 或 v2ray）。
+
+2. 安装依赖
+Bash
+
+npm install
+或者手动安装核心库：
+
+Bash
+
+npm install @solana/web3.js https-proxy-agent node-fetch
 npm install --save-dev typescript ts-node @types/node
-```
+3. 配置代理 (至关重要)
+打开 src/monitor.ts，找到顶部配置区域，填入你的本地代理端口：
 
-**说明：**
-- `@solana/web3.js` - Solana Web3 SDK（类似 Java 的第三方库）
-- `typescript` - TypeScript 编译器
-- `ts-node` - 可以直接运行 TypeScript 文件，无需先编译（类似 Java 的 `java` 命令可以直接运行 `.java` 文件）
-- `@types/node` - Node.js 的类型定义（提供类型提示）
+TypeScript
 
-### 3. 验证安装
+// Clash 通常是 7890，v2ray 通常是 10808
+const PROXY_URL = 'http://127.0.0.1:7890'; 
+4. 配置监控钱包
+在项目根目录创建或修改 wallets.json 文件。格式如下：
 
-检查 `package.json` 是否包含所有依赖：
+JSON
 
-```bash
-cat package.json
-```
+[
+  {
+    "address": "GjXobpiEexQqqLkghB29AtcwyJRokbeGDSkz8Kn7GGr1",
+    "name": "聪明钱-1号",
+    "emoji": "👻"
+  },
+  {
+    "address": "DxM1hfY8FQ8dNGrucuJzhJcF8KRbjk8WBwrgKvQ9spPv",
+    "name": "巨鲸-KOL",
+    "emoji": "🐋"
+  }
+]
+💡 小贴士：如果你有大量原始格式的数据，可以使用项目附带的 fix_wallets.py 脚本自动转换并清洗格式。
 
-应该看到 `dependencies` 和 `devDependencies` 部分都有相应的包。
+5. 启动监控
+Bash
 
-## 运行脚本
-
-### 方式一：使用 npm script（推荐）
-
-```bash
 npm start
-```
+📊 输出示例
+系统启动后，你将看到如下清晰的日志：
 
-或者：
+Plaintext
 
-```bash
-npm run dev
-```
-
-### 方式二：直接使用 ts-node
-
-```bash
-npx ts-node src/monitor.ts
-```
-
-**说明：**
-- `npx` 类似于 Java 的 `java -jar`，可以直接运行本地安装的包
-- `ts-node` 会先编译 TypeScript 代码，然后执行（类似 Java 的即时编译）
-
-## 配置钱包地址
-
-编辑 `src/monitor.ts` 文件，修改 `WALLET_ADDRESSES` 数组：
-
-```typescript
-const WALLET_ADDRESSES: string[] = [
-    'HhJpBhRRn4g56VsyLuT8DL5iXVhoChVNxuy36yZ7RfVH',  // 钱包1
-    '你的钱包地址2',  // 钱包2
-    '你的钱包地址3'   // 钱包3
-];
-```
-
-## 输出示例
-
-```
 ========================================
-   Solana 钱包余额监控系统
+   Solana 巨鲸监控系统 (V12 CA增强版)
 ========================================
+[系统] 监控 359 个钱包，分 8 组轮询...
+[初始化] 建立余额基准...
+[初始化] 完成，开始监控交易...
 
-[连接成功] Solana 节点版本: 1.18.0
+----------------------------------------
+[19:25:43] 🟢 买入 | 👻 Miku榜一
+   代币: Pnut (+1000.00)
+   CA: 8wXt...pump
+   金额: 1.0724 SOL
+   TX: https://solscan.io/tx/2TU...
+----------------------------------------
+[19:28:10] 💸 纯SOL转出 | 🐋 交易所提现
+   金额: -50.0000 SOL
+   TX: https://solscan.io/tx/5pq...
+----------------------------------------
+[19:30:05] 🔴 卖出 | 👻 土狗猎手
+   代币: ChillGuy (-50000.00)
+   CA: DF5x...pump
+   金额: 3.5200 SOL
+   TX: https://solscan.io/tx/33W...
+⚠️ 常见问题
+1. 为什么显示 Error: fetch failed？
+原因：Node.js 无法连接到 Solana 节点或 DexScreener API。 解决：请检查 src/monitor.ts 中的 PROXY_URL 是否与你的梯子端口一致（Clash 默认为 7890）。
 
-[信息] 准备监控 1 个钱包地址
+2. 为什么有时候显示“未索引到交易”？
+原因：Solana 公共节点的某些 API 存在延迟，余额变了但交易记录还没同步。 解决：V12 版本已内置重试机制，会自动等待 2 秒后再次查询。如果依然失败，说明节点延迟极高，建议稍后由系统自动恢复。
 
-[初始化] 钱包 HhJpBhRRn4g56VsyLuT8DL5iXVhoChVNxuy36yZ7RfVH
-  当前余额: 1234.567890123 SOL
-  开始监控...
+3. 如何监控几百个钱包不报错？
+原理：本系统将钱包分为 50 个一组，每组之间强制休眠 0.2~0.5 秒，且在检测到交易详情时使用“单线程队列”排队查询。这是为了适应免费公共节点的速率限制（Rate Limits）。
 
-[信息] 钱包 HhJpBhRRn4g56VsyLuT8DL5iXVhoChVNxuy36yZ7RfVH 的订阅 ID: 12345
-
-[信息] 所有监控任务已启动
-[信息] 按 Ctrl+C 退出程序
-
-[2024/01/15 14:30:25] 💰 转入
-  钱包地址: HhJpBhRRn4g56VsyLuT8DL5iXVhoChVNxuy36yZ7RfVH
-  变动金额: +10.500000000 SOL
-  当前余额: 1245.067890123 SOL
-  区块高度: 123456789
-```
-
-## 技术说明（Java 开发者参考）
-
-### 异步编程
-
-- **Promise** - 类似于 Java 的 `CompletableFuture<T>`
-- **async/await** - 类似于 Java 的 `.get()` 或 `.join()`，用于等待异步操作完成
-- **.then()/.catch()** - 类似于 Java 的 `.thenApply()` 和 `.exceptionally()`
-
-### WebSocket vs 轮询
-
-- **onAccountChange** - 使用 WebSocket 长连接，Solana 节点会主动推送更新
-- **优势**：延迟低（毫秒级）、效率高（不占用带宽）、实时性强
-- **对比**：如果使用轮询，需要每秒请求一次，延迟高且浪费资源
-
-### 类型系统
-
-- **TypeScript** - 提供编译时类型检查（类似 Java 的静态类型）
-- **PublicKey** - 强类型包装类，确保地址格式正确
-- **类型推断** - TypeScript 可以自动推断类型（类似 Java 的 `var`）
-
-## 常见问题
-
-### 1. 连接失败
-
-如果看到 "连接失败" 错误，可能原因：
-- 网络问题
-- RPC 节点限制（公共节点有速率限制）
-- 解决方案：使用付费 RPC 节点（如 QuickNode, Alchemy）
-
-### 2. 监控不工作
-
-- 检查钱包地址格式是否正确
-- 确认钱包有余额（余额为 0 的钱包可能无法监控）
-- 检查网络连接
-
-### 3. 如何停止程序
-
-按 `Ctrl+C` 退出程序。
-
-## 项目结构
-
-```
+📂 项目结构
 sol-whale-monitor/
 ├── src/
-│   └── monitor.ts          # 主监控脚本
-├── package.json            # 项目配置和依赖
-├── tsconfig.json           # TypeScript 配置
-└── README.md               # 本文件
-```
-
-## 下一步
-
-- 添加数据库存储历史记录
-- 添加 Webhook 通知
-- 添加更多监控指标（如交易数量、Gas 费用等）
-- 使用付费 RPC 节点提高稳定性
-
-## 许可证
-
-MIT
-
+│   └── monitor.ts          # V12 核心监控代码
+├── scripts/
+│   └── fix_wallets.py      # (可选) 钱包数据清洗脚本
+├── wallets.json            # 钱包配置文件
+├── package.json
+└── README.md
+🤝 贡献与许可
+MIT License. 仅供学习研究使用，请勿用于非法用途。
