@@ -1237,7 +1237,7 @@
   },
   {
     "address": "GJtxW7eTpbt4oC26ZGjRFPUNzied2Tz8KW2HMcjfRWjh",
-    "name": "me"
+    "name": "rank11"
   },
   {
     "address": "HUpPyLU8KWisCAr3mzWy2FKT6uuxQ2qGgJQxyTpDoes5",
@@ -1435,4 +1435,10 @@
     "address": "2QSKWMxywYu2dhLt8Ru1QUhAYAjMHW58ern3fRnw8hBi",
     "name": "AICRYNODE内盘狙击"
   }
+  ,
+  {
+    "address": "2fg5QD1eD7rzNNCsvnhmXFm5hqNgwTTG8p7kQ6f3rx6f",
+    "name": "Cupsey"
+  }
+
 ]

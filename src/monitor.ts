@@ -5,22 +5,27 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import fetch from 'node-fetch';
 
 /**
- * Solana 巨鲸监控系统 (V12 CA增强版)
+ * Solana 巨鲸监控系统 (V13 死磕防漏版)
  * * 核心升级：
- * 1. [新增] 强制显示代币合约地址 (CA)，方便复制查询。
- * 2. [优化] 修复日志中出现大量空行的问题。
- * 3. [清洗] 进一步优化代币名称显示逻辑。
+ * 1. [死磕机制] 余额变动后，若未查到交易，将进行 5 次指数级重试 (2s, 3s, 4s...)。
+ * 2. [RPC优化] 支持直接填入 Helius/QuickNode 的 API Key。
+ * 3. [防漏单] 只要余额变了，就算查不到交易详情，最终也会强制播报余额变动。
  */
 
 // ==================== 1. 基础配置 ====================
-const PROXY_URL = 'http://127.0.0.1:7890'; // 请确认端口
+// ⚠️ 强烈建议替换为 Helius 免费 RPC，公共节点极易漏单
+// 格式: 'https://mainnet.helius-rpc.com/?api-key=xxxxxxx'
+const CUSTOM_RPC_URL = ''; 
+
+// 代理配置 (Clash: 7890)
+const PROXY_URL = 'http://127.0.0.1:7890'; 
 const proxyAgent = new HttpsProxyAgent(PROXY_URL);
 
 const customFetch = (url: string, options: any = {}) => {
     return fetch(url, { ...options, agent: proxyAgent });
 };
 
-// ==================== 2. 代币解析工具 ====================
+// ==================== 2. 代币名称解析 ====================
 const tokenMetadataCache = new Map<string, string>();
 const WSOL_MINT = 'So11111111111111111111111111111111111111112';
 tokenMetadataCache.set(WSOL_MINT, 'SOL');
@@ -30,36 +35,24 @@ tokenMetadataCache.set('Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', 'USDT');
 const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
 function isStandardTicker(str: string): boolean {
-    // 允许英文字母、数字、美元符、空格
     return /^[A-Za-z0-9$ ]+$/.test(str);
 }
 
-/**
- * 尝试从 DexScreener 获取代币信息
- */
 async function fetchFromDexScreener(mint: string): Promise<string | null> {
     try {
         const url = `https://api.dexscreener.com/latest/dex/tokens/${mint}`;
         const res = await customFetch(url);
         if (!res.ok) return null;
         const data = await res.json();
-        if (data.pairs && data.pairs.length > 0) {
-            return data.pairs[0].baseToken.symbol;
-        }
+        if (data.pairs && data.pairs.length > 0) return data.pairs[0].baseToken.symbol;
         return null;
     } catch (e) { return null; }
 }
 
-/**
- * 获取代币符号 (优先 API -> 链上 -> 缩写)
- */
 async function getSymbolFromMint(connection: Connection, mintAddress: string): Promise<string> {
     if (tokenMetadataCache.has(mintAddress)) return tokenMetadataCache.get(mintAddress)!;
-    
-    // 默认显示缩写，作为保底
     const shortName = `${mintAddress.slice(0, 4)}..${mintAddress.slice(-4)}`;
     
-    // 1. 优先尝试 DexScreener (数据最干净)
     try {
         const apiSymbol = await fetchFromDexScreener(mintAddress);
         if (apiSymbol) {
@@ -68,7 +61,6 @@ async function getSymbolFromMint(connection: Connection, mintAddress: string): P
         }
     } catch (e) {}
 
-    // 2. 尝试链上 Metaplex 解析 (针对刚发的新币)
     try {
         const mintKey = new PublicKey(mintAddress);
         const [pda] = PublicKey.findProgramAddressSync(
@@ -83,16 +75,13 @@ async function getSymbolFromMint(connection: Connection, mintAddress: string): P
             const symbolLen = accountInfo.data.readUInt32LE(offset);
             offset += 4;
             let symbol = accountInfo.data.toString('utf8', offset, offset + symbolLen).replace(/\u0000/g, '').trim();
-            
-            // 简单的清洗：如果名字太长或者包含乱码，可能不想显示
-            if (symbol && symbol.length < 15) {
+            if (symbol && isStandardTicker(symbol)) {
                 tokenMetadataCache.set(mintAddress, symbol);
                 return symbol;
             }
         }
     } catch (e) {}
 
-    // 3. 实在不行，返回缩写，但因为我们现在会显示 CA，所以缩写也无所谓
     tokenMetadataCache.set(mintAddress, shortName);
     return shortName;
 }
@@ -105,13 +94,19 @@ const PUBLIC_RPC_ENDPOINTS = [
 ];
 
 async function chooseRpcEndpoint(): Promise<string> {
-    const envRpc = process.env.SOLANA_RPC_ENDPOINT;
-    if (envRpc) return envRpc;
+    // 1. 如果填了自定义 RPC，直接用
+    if (CUSTOM_RPC_URL && CUSTOM_RPC_URL.length > 10) {
+        console.log(`[配置] 使用自定义 RPC 节点`);
+        return CUSTOM_RPC_URL;
+    }
+
+    // 2. 否则用公共节点
     for (const endpoint of PUBLIC_RPC_ENDPOINTS) {
         try {
             const conn = new Connection(endpoint, { fetch: customFetch as any });
             const v = await conn.getVersion();
-            console.log(`[连接] 成功: ${endpoint} (v${v['solana-core']})`);
+            console.log(`[连接] 成功连接公共节点: ${endpoint} (v${v['solana-core']})`);
+            console.log(`[建议] 公共节点极易漏单，强烈建议申请 Helius 免费 Key 填入代码顶部！`);
             return endpoint;
         } catch (e) {}
     }
@@ -149,7 +144,7 @@ function loadWalletConfigs(): WalletConfig[] {
     }
 }
 
-// ==================== 5. 交易解析逻辑 ====================
+// ==================== 5. 交易解析逻辑 (V13 死磕版) ====================
 
 interface TradeDetails {
     signature: string;
@@ -167,18 +162,36 @@ async function fetchLastTransactionDetails(
     connection: Connection, 
     pubKey: PublicKey
 ): Promise<TradeDetails | null> {
-    try {
-        let signatures = await connection.getSignaturesForAddress(pubKey, { limit: 3 });
-        if (signatures.length === 0) {
-            await sleep(2000);
+    let signatures: any[] = [];
+    let attempts = 0;
+    const maxRetries = 5; // 死磕 5 次
+
+    // --- 阶段 1: 死磕获取签名 ---
+    while (attempts < maxRetries) {
+        try {
             signatures = await connection.getSignaturesForAddress(pubKey, { limit: 3 });
+            
+            // 如果拿到了签名，且没有错误，就跳出循环
+            if (signatures.length > 0 && !signatures[0].err) {
+                break;
+            }
+        } catch (e) {
+            // 忽略网络错误，继续重试
         }
-        if (signatures.length === 0) return null;
-        
-        const validSig = signatures.find(s => !s.err);
-        if (!validSig) return null;
-        const sig = validSig.signature;
-        
+
+        attempts++;
+        // 指数退避：第一次等 2s, 第二次 3s, 第三次 4s...
+        if (attempts < maxRetries) {
+            // console.log(`[重试] 未索引到交易，第 ${attempts} 次重试...`);
+            await sleep(1000 + (attempts * 1000));
+        }
+    }
+
+    if (signatures.length === 0) return null;
+    const sig = signatures[0].signature;
+
+    // --- 阶段 2: 获取详情 ---
+    try {
         const tx = await connection.getParsedTransaction(sig, {
             maxSupportedTransactionVersion: 0,
             commitment: 'confirmed'
@@ -233,7 +246,6 @@ async function fetchLastTransactionDetails(
 
         const totalSolFlow = nativeDiff + wSolDiff;
 
-        // --- 逻辑分支 ---
         if (targetMint) {
             const symbol = await getSymbolFromMint(connection, targetMint);
             return {
@@ -331,6 +343,7 @@ async function startPolling(connection: Connection, wallets: WalletConfig[]) {
 
                     if (cur !== old) {
                         const diffSol = lamportsToSol(cur - old);
+                        // 任何微小变动都记录，防止漏 wSOL 交易
                         if (Math.abs(diffSol) > 0.000001) { 
                             balanceCache.set(wallet.address, cur); 
                             updates.push({ wallet, cur, diffSol });
@@ -348,6 +361,7 @@ async function startPolling(connection: Connection, wallets: WalletConfig[]) {
                         const time = formatTime();
                         
                         if (details) {
+                            // 成功抓取到交易详情
                             if (details.type === 'TRANSFER') {
                                 if (Math.abs(details.solChange) > 0.001) {
                                     const action = details.solChange > 0 ? "💰 纯SOL转入" : "💸 纯SOL转出";
@@ -365,16 +379,17 @@ async function startPolling(connection: Connection, wallets: WalletConfig[]) {
                                 console.log('----------------------------------------');
                                 console.log(`[${time}] ${action} | ${nameDisplay}`);
                                 console.log(`   代币: ${tokenInfo}`);
-                                console.log(`   CA: ${details.tokenMint}`); // <--- 新增 CA 显示
+                                console.log(`   CA: ${details.tokenMint}`);
                                 console.log(`   金额: ${solInfo}`);
                                 console.log(`   TX: https://solscan.io/tx/${details.signature}`);
                             }
                         } else {
+                            // 兜底：虽然重试了5次还是没查到交易，但必须播报余额变动，防止漏消息
                             if (Math.abs(diffSol) > 0.01) {
                                 const action = diffSol > 0 ? "💰 余额增加" : "💸 余额减少";
                                 console.log('----------------------------------------');
                                 console.log(`[${time}] ${action} | ${nameDisplay}`);
-                                console.log(`   金额: ${diffSol > 0 ? '+' : ''}${diffSol.toFixed(4)} SOL (延迟,未索引到交易)`);
+                                console.log(`   金额: ${diffSol > 0 ? '+' : ''}${diffSol.toFixed(4)} SOL (⚠️ 节点严重延迟，未索引到交易)`);
                             }
                         }
                         if (updates.length > 1) await sleep(2000);
@@ -399,7 +414,7 @@ async function main() {
         const endpoint = await chooseRpcEndpoint();
         const connection = new Connection(endpoint, { commitment: 'confirmed', fetch: customFetch as any });
         console.log('========================================');
-        console.log('   Solana 巨鲸监控系统 (V12 CA增强版)');
+        console.log('   Solana 巨鲸监控系统 (V13 死磕防漏版)');
         console.log('========================================');
         startPolling(connection, wallets).catch(console.error);
     } catch (e) {
