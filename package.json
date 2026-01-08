@@ -20,10 +20,12 @@
     "@solana/web3.js": "^1.98.4",
     "@types/node-fetch": "^2.6.13",
     "https-proxy-agent": "^7.0.6",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "node-telegram-bot-api": "^0.67.0"
   },
   "devDependencies": {
     "@types/node": "^20.19.27",
+    "@types/node-telegram-bot-api": "^0.64.13",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

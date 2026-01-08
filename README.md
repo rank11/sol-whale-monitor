@@ -1,123 +1,132 @@
-🐳 Solana 巨鲸监控系统 (V13 极速死磕版)
-这是一个专为高频监控 Solana 链上“聪明钱”和“巨鲸”地址设计的专业级监控系统。
+🐳 Solana 巨鲸/聪明钱监控系统 (V17 引流版)
+Solana Smart Money Monitor V17 - Telegram Alert & Affiliate Edition
 
-V13 版本针对 实时性 和 数据准确性 进行了极致优化。它不仅能以秒级频率轮询数百个钱包，还内置了强大的交易解析引擎，能够精准识别 Swap、转账、以及 wSOL 包装行为，彻底解决了“0 金额误报”和“代币名称乱码”等痛点。
+这是一个企业级的 Solana 链上监控系统，专为捕捉“聪明钱”和“内幕钱包”动向而生。它不仅是一个监控脚本，更是一个自动化的 Alpha 信号生成器。
 
-✨ 核心特性 (V13 升级)
-⚡ 1秒极速轮询：采用批量并发轮询机制，支持对 300+ 个钱包进行秒级监控，几乎零延迟捕捉链上动向。
+V17 版本集成了 Telegram 自动推送、RugCheck 安全评分以及自定义邀请链接，非常适合用于运营付费信号群或个人快速跟单。
 
-🛡️ 死磕防漏机制：内置指数级重试逻辑。如果余额变动但 RPC 尚未索引到交易详情，系统会连续重试 5 次（死磕模式），确保不漏掉任何一笔交易。
+🔥 核心优势
+⚡ 毫秒级极速捕捉：支持 Alchemy/Helius 节点 1秒/轮 的超高频轮询，几乎与链上同步。
 
-🧠 智能交易解析：
+📱 Telegram 自动报警：
 
-上帝视角：通过解析 Transaction Log 精准区分 Swap (买卖)、Transfer (转账) 和 Wrap (SOL打包)。
+自动推送精排版的 HTML 消息到频道或私聊。
 
-精准计费：自动合并 Native SOL 和 wSOL 的变动，彻底修复 "0.0000 SOL" 误报 bug。
+消息包含代币信息、价格市值、安全评分及一键跟单链接。
 
-CA 直显：每笔交易强制显示代币合约地址 (CA)，方便直接复制去看线。
+💰 商业变现/引流：
 
-💎 代币深度识别：优先调用 DexScreener API 获取准确的代币名称（如 Pnut, ChillGuy），自动清洗链上乱码。
+Axiom / GMGN 定制：所有推送链接自动携带你的专属邀请码（ref / invite），流量直接变现。
 
-🌐 内置代理支持：原生集成 https-proxy-agent，直连 Solana RPC 和 DexScreener API，解决网络连接问题。
+Axiom 直达：集成 Axiom Trade 专业交易终端链接。
+
+🛡️ 风险过滤引擎：
+
+RugCheck 直显：直接调用 API 显示代币安全分（✅安全 / ⚠️警告 / ☠️危险），无需人工查验。
+
+去噪逻辑：自动过滤 wSOL 打包、小额 Gas 费转账，只推送 Swap 买卖和大额转账。
+
+🧠 智能解析内核：
+
+上帝视角：通过 Transaction Log 精准识别 Jupiter/Raydium/Pump.fun 的交易行为。
+
+CA 直显：每笔交易强制附带合约地址，方便复制。
 
 🛠️ 技术栈
-Runtime: Node.js & TypeScript
+核心语言: TypeScript / Node.js
 
-Solana SDK: @solana/web3.js
+区块链交互: @solana/web3.js
 
-Network: node-fetch + https-proxy-agent
+消息推送: node-telegram-bot-api
 
-RPC: 支持 Helius, Alchemy, QuickNode 等私有节点
+数据源: Helius/Alchemy (RPC), DexScreener (价格), RugCheck (安全)
 
-🚀 快速开始
-1. 环境准备
-Node.js (v16+)
+网络增强: https-proxy-agent (支持代理直连)
 
-npm 或 yarn
+🚀 快速部署指南
+1. 安装依赖
+确保 Node.js 版本 >= 16。
 
-科学上网环境 (Clash/V2Ray 等)
-
-2. 安装依赖
 Bash
 
+# 安装核心依赖
 npm install
-3. 关键配置 (必读⚠️)
-打开 src/monitor.ts 文件顶部，修改以下两处配置：
 
-A. 配置 RPC 节点 (决定速度) 为了实现 1秒 轮询，强烈建议使用 Helius 或 Alchemy 的免费私有节点。公共节点极大概率会漏单或报错。
-
-TypeScript
-
-// 在 src/monitor.ts 第 18 行左右
-const CUSTOM_RPC_URL = 'https://mainnet.helius-rpc.com/?api-key=你的API_KEY';
-B. 配置代理 (解决网络报错) 根据你的梯子软件端口修改：
+# 确保安装了 Telegram SDK 和类型定义
+npm install node-telegram-bot-api
+npm install --save-dev @types/node-telegram-bot-api
+2. 配置文件 (src/monitor.ts)
+打开 src/monitor.ts 顶部，填入你的配置信息：
 
 TypeScript
 
-// 在 src/monitor.ts 第 21 行左右
-const PROXY_URL = 'http://127.0.0.1:7890'; // Clash通常是7890，v2ray通常是10808
-4. 准备钱包数据
-在项目根目录创建 wallets.json。 如果你有大量格式混乱的原始数据，可以使用项目自带的修复脚本：
+// 1. RPC 节点 (强烈建议使用 Alchemy 免费版以支持 1秒轮询)
+const CUSTOM_RPC_URL = 'https://solana-mainnet.g.alchemy.com/v2/你的API_KEY';
 
-新建 wallets.json，把你的原始数据粘贴进去（哪怕格式不对）。
+// 2. Telegram 机器人配置
+const TG_BOT_TOKEN = '123456:ABC-DEF...'; // 找 @BotFather 获取
+const TG_CHAT_ID = '-100xxxxxx';          // 你的频道或群组 ID
 
-运行修复脚本：
+// 3. 引流/邀请码配置 (修改为你自己的)
+const REF_CONFIG = {
+    gmgn: 'rank1143',  // 你的 GMGN 邀请码
+    axiom: 'rank1143'  // 你的 Axiom 邀请码
+};
 
-Bash
+// 4. 网络代理 (解决国内无法连接 TG/RPC 问题)
+const PROXY_URL = 'http://127.0.0.1:7890';
+3. 导入钱包数据
+在项目根目录创建 wallets.json。格式如下：
 
-python3 fix_wallets.py
-脚本会自动清洗数据、补全名字并生成标准的 wallets.json。
+JSON
 
-5. 启动监控
+[
+  {
+    "address": "GjXobpiEexQqqLkghB29AtcwyJRokbeGDSkz8Kn7GGr1",
+    "name": "聪明钱-01",
+    "emoji": "👻"
+  }
+]
+提示：如果你有大量原始数据，请使用 python3 fix_wallets.py 脚本自动清洗和格式化。
+
+4. 启动系统
 Bash
 
 npm start
-📊 输出示例
-启动后，你将看到如下清晰的日志：
+📱 推送效果预览 (Telegram)
+当监控到买入信号时，你的频道将收到如下消息：
 
-Plaintext
+🟢 Smart Money Buy! 👻 Wallet: 聪明钱-KOL GjXo...GGr1
 
-========================================
-   Solana 巨鲸监控系统 (V13 极速版)
-========================================
-[系统] 监控 359 个钱包，分 8 组轮询...
-[极速模式] 轮询间隔: 1000ms (注意流量消耗)
-...
+💊 Token: Pnut 📊 Amt: +5000.00 💰 Cost: 2.50 SOL 💲 Price: $0.0012 | MC: $1.2M 🛡️ Risk: ✅ 安全(120)
 
-----------------------------------------
-[19:25:43] 🟢 买入 | 👻 聪明钱-01
-   代币: Pnut (+1000.00)
-   CA: 8wXt...pump  <-- 直接复制这个CA
-   金额: 1.0724 SOL
-   TX: https://solscan.io/tx/2TU...
-----------------------------------------
-[19:28:10] 💸 纯SOL转出 | 🐋 交易所提现
-   金额: -50.0000 SOL
-   TX: https://solscan.io/tx/5pq...
-⚠️ 流量消耗预警
-当前代码默认开启 1000ms (1秒) 轮询频率。对于 359 个钱包：
+🎯 CA: 8wXt...pump (点击复制)
 
-每日消耗：约 700,000 (70万) 积分/请求数。
+🛠️ Quick Links: [GMGN] | [Axiom] | [RugCheck] (链接已自动绑定你的邀请码)
 
-Helius 免费版：额度 100万/月 -> 仅够跑 1.5 天。
+⚠️ 流量与成本控制
+本系统默认开启 极速模式 (1秒/次)。
 
-Alchemy 免费版：额度 3亿/月 -> 随便跑，永不枯竭。
+Alchemy 用户：免费版每月 3亿 CU，完全足够跑 1秒轮询，建议使用 Alchemy。
 
-建议：如果你使用 Helius，请在 src/monitor.ts 底部将 INTERVAL 改为 30000 (30秒)；如果你申请到了 Alchemy，保持 1秒 即可。
+Helius 用户：免费版每月 100万 Credits。请务必将代码底部的 INTERVAL 改为 30000 (30秒)，否则额度将在 2 天内耗尽。
 
 📂 项目结构
+Plaintext
+
 sol-whale-monitor/
 ├── src/
-│   └── monitor.ts          # V13 核心监控代码
-├── fix_wallets.py          # 钱包数据清洗脚本 (Python)
-├── wallets.json            # 监控目标配置文件
+│   └── monitor.ts          # V17 核心主程序
+├── scripts/
+│   └── fix_wallets.py      # 钱包数据清洗工具
+├── wallets.json            # 监控名单
 ├── package.json
-└── tsconfig.json
-常见问题 (FAQ)
-Q: 为什么显示 "余额增加... (延迟,未索引到交易)"？ A: 这是因为你轮询速度太快（1秒），RPC 节点还没来得及把那笔交易存入数据库。V13 版本会自动重试 5 次（耗时约 15秒），如果 5 次后还查不到，就会显示这条兜底日志，确保你知道钱动了。
+└── README.md
+🤝 贡献与免责声明
+本项目仅供学习和区块链数据分析研究使用。
 
-Q: 为什么有些代币名字还是显示未知？ A: 对于刚刚发射几秒钟的土狗盘，DexScreener 和链上 Metadata 可能都还没生成。此时系统会优先显示 未知代币 并提供 CA，你可以直接复制 CA 去看线。
+加密货币投资风险极高，工具提供的安全评分仅供参考，不构成投资建议。
 
-Q: 报错 fetch failed 或 Socket Error？ A: 99% 是代理没配置好。请检查 src/monitor.ts 里的 PROXY_URL 端口是否正确。
+License: MIT
 
-Disclaimer: 本工具仅供学习与研究使用，加密货币投资风险巨大，请自行把控风险。
+Happy Hunting! 🐳
