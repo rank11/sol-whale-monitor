@@ -83,7 +83,8 @@ Unlike simple transaction listeners, this system features a **Dual-Core Data Eng
 
 #### 📱 效果预览 (Telegram 推送)
 > 实时推送买卖信息，包含精确价格、市值、风险评分及快捷交易链接。
-![Telegram 推送预览](image_5a6082.jpg)
+![Telegram 推送预览]<img width="627" height="572" alt="image" src="https://github.com/user-attachments/assets/d5b8f247-6d6f-46ef-add2-d46bacd2b4e4" />
+
 
 ### ✨ 核心功能
 1.  **🚀 双核数据引擎**:
@@ -138,7 +139,8 @@ Unlike simple transaction listeners, this system features a **Dual-Core Data Eng
 
 #### 🖥️ 运行状态 (终端日志)
 > 支持高并发多线程解析，并在遇到限流时自动智能降速。
-![终端运行日志](image_5a6024.jpg)
+![终端运行日志]<img width="1024" height="971" alt="image" src="https://github.com/user-attachments/assets/94924a91-0a59-4dbe-a286-89665778c058" />
+
 
 ### ⚙️ 参数详解 (src/monitor.ts)
 
